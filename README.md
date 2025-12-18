@@ -1,3 +1,4 @@
+![Screen Shot][product-screenshot]
 # 🌸 Flower Classifier – Deep Learning with Docker
 
 This project is an image classification system that predicts the type of a flower from an uploaded image.
@@ -113,3 +114,5 @@ Each image is:
 Bugra MURAT
 
 Deep Learning · Computer Vision · Docker
+
+[product-screenshot]: /screenshot.png
