@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flower Classifier</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌸</text></svg>">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+    .result-box {
+        max-height: 0;
+        opacity: 0;
+        transition: all 0.5s ease-in-out;
+        overflow: hidden;
+    }
+    
+    .result-box.show {
+        max-height: 200px;
+        opacity: 1;
+    }
+    
+    .preview-container {
+        max-height: 300px;
+        transition: all 0.3s ease;
+    }
+    
+    .loading-text {
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+
+    /* Pollen animation */
+    .pollen {
+        position: fixed;
+        pointer-events: none;
+        z-index: -1;
+        opacity: 0.7;
+        animation: float linear infinite;
+    }
+    
+    @keyframes float {
+        to {
+            transform: translateY(-100vh) rotate(360deg);
+        }
+    }
+
+    .designer-credit {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        pointer-events: none;
+        z-index: 9999;
+        font-family: 'Poppins', 'Segoe UI', sans-serif;
+        font-weight: 500;
+        font-size: 14px;
+        color: #000; /* canlı mor ton */
+        text-shadow: 1px 1px 4px rgba(0,0,0,0.2);
+        background: rgba(255, 255, 255, 0.05);
+        padding: 4px 8px;
+        border-radius: 8px;
+        backdrop-filter: blur(5px);
+        transition: transform 0.3s ease, opacity 0.3s ease, color 0.3s ease;
+        opacity: 0.4;
+    }
+    
+    .designer-credit:hover {
+        transform: translateY(-3px) scale(1.05);
+        color: #c084fc;
+        opacity: 1;
+    }
+
+    .predict-btn {
+        background: linear-gradient(135deg, 
+            rgba(192, 132, 252, 0.8) 0%, 
+            rgba(139, 92, 246, 0.9) 50%, 
+            rgba(124, 58, 237, 0.8) 100%);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-bottom: 2px solid rgba(255, 255, 255, 0.5);
+        color: white;
+        font-weight: 700;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        box-shadow: 
+            0 8px 32px rgba(124, 58, 237, 0.3),
+            inset 0 1px 0 rgba(255, 255, 255, 0.4),
+            inset 0 -2px 0 rgba(0, 0, 0, 0.1);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .predict-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, 
+            transparent, 
+            rgba(255, 255, 255, 0.3), 
+            transparent);
+        transition: left 0.6s;
+    }
+    
+    .predict-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 
+            0 12px 40px rgba(124, 58, 237, 0.4),
+            inset 0 1px 0 rgba(255, 255, 255, 0.5),
+            inset 0 -2px 0 rgba(0, 0, 0, 0.1);
+        background: linear-gradient(135deg, 
+            rgba(192, 132, 252, 0.9) 0%, 
+            rgba(139, 92, 246, 1) 50%, 
+            rgba(124, 58, 237, 0.9) 100%);
+    }
+    
+    .predict-btn:hover::before {
+        left: 100%;
+    }
+    
+    .predict-btn:active {
+        transform: translateY(0);
+        box-shadow: 
+            0 4px 20px rgba(124, 58, 237, 0.3),
+            inset 0 1px 0 rgba(255, 255, 255, 0.3),
+            inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+    }
+    
+    .predict-btn:disabled {
+        opacity: 0.6;
+        transform: none;
+        box-shadow: none;
+    }
+    
+    .predict-btn:disabled::before {
+        display: none;
+    }
+
+        @keyframes gradient-shift {
+        0%, 100% {
+            background-position: 0% 50%;
+        }
+        50% {
+            background-position: 100% 50%;
+        }
+    }
+
+    .gradient-title {
+        background: linear-gradient(135deg, 
+            #ec4899 0%, 
+            #8b5cf6 25%, 
+            #3b82f6 50%, 
+            #10b981 75%, 
+            #f59e0b 100%);
+        background-size: 200% 200%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        animation: gradient-shift 3s ease infinite;
+        font-weight: 800;
+    }
+    
+    @keyframes gradient-shift {
+        0%, 100% {
+            background-position: 0% 50%;
+        }
+        50% {
+            background-position: 100% 50%;
+        }
+    }
+
+    .flower-emoji {
+        font-size: 2.5rem;
+        animation: gentle-bounce 2s ease-in-out infinite;
+        display: inline-block;
+        margin-right: 0.5rem;
+        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+    }
+    
+    @keyframes gentle-bounce {
+        0%, 100% {
+            transform: translateY(0) rotate(0deg);
+        }
+        50% {
+            transform: translateY(-5px) rotate(5deg);
+        }
+    }
+    
+    .gradient-progress {
+        background: linear-gradient(90deg, 
+            #ef4444 0%, 
+            #f59e0b 20%, 
+            #10b981 40%, 
+            #3b82f6 60%, 
+            #8b5cf6 80%, 
+            #ec4899 100%);
+        background-size: 200% 100%;
+        animation: progress-glow 2s ease-in-out infinite alternate;
+        box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .gradient-progress::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, 
+            transparent, 
+            rgba(255, 255, 255, 0.4), 
+            transparent);
+        animation: shine 1.5s ease-in-out infinite;
+    }
+    
+    @keyframes progress-glow {
+        0% {
+            background-position: 0% 0%;
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+        }
+        100% {
+            background-position: 100% 0%;
+            box-shadow: 0 0 30px rgba(236, 72, 153, 0.4);
+        }
+    }
+    
+    @keyframes shine {
+        0% {
+            left: -100%;
+        }
+        100% {
+            left: 100%;
+        }
+    }
+    
+    .gradient-confidence {
+        background: linear-gradient(135deg, 
+            #10b981 0%, 
+            #3b82f6 50%, 
+            #8b5cf6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-weight: 700;
+    }
+    
+    .gradient-prediction {
+        background: linear-gradient(135deg, 
+            #ec4899 0%, 
+            #8b5cf6 50%, 
+            #3b82f6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-weight: 700;
+    }
+        
+    /* z-index for container */
+    .container {
+        position: relative;
+        z-index: 10;
+    }
+    
+</style>
+</head>
+
+<body class="bg-gradient-to-br from-purple-100 to-pink-100 min-h-screen py-8">
+     <!-- Designer Credit -->
+    <div class="designer-credit">
+        designed by bugramurat
+    </div>
+
+    <div id="pollens"></div>
+
+    <div class="container mx-auto px-4">
+        <div class="bg-white shadow-2xl rounded-3xl p-6 md:p-8 max-w-md mx-auto">
+            <!-- Header -->
+            <div class="text-center mb-6">
+                <div class="flex items-center justify-center mb-2">
+                    <span class="flower-emoji">🌸</span>
+                    <h1 class="gradient-prediction text-4xl font-bold">Flower Classifier</h1>
+                </div>
+                <p class="text-gray-600">Upload a flower image and let the custom trained EfficientNetB0 model predict!</p>
+            </div>
+
+            <!-- File Input -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Choose an image
+                </label>
+                <input id="fileInput" type="file" accept="image/*" 
+                    class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 cursor-pointer" />
+            </div>
+
+            <!-- Preview Image -->
+            <div id="previewContainer" class="preview-container hidden mb-6 bg-gray-50 rounded-xl p-4">
+                <div class="text-center mb-3">
+                    <span class="text-sm font-medium text-gray-600">Preview</span>
+                </div>
+                <img id="preview" class="w-full h-48 object-contain rounded-lg mx-auto"/>
+            </div>
+
+            <!-- Predict Button -->
+            <button id="predictBtn" 
+                class="predict-btn w-full px-6 py-4 rounded-xl font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                Predict 🌼
+            </button>
+
+            <!-- Result -->
+            <div id="result" class="result-box mt-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200">
+                <div class="text-center">
+                    <div id="resultContent"></div>
+                </div>
+            </div>
+
+            <!-- Loading Spinner -->
+            <div id="loadingSpinner" class="hidden mt-6 text-center">
+                <p id="loadingText" class="loading-text text-purple-600 font-medium"></p>
+            </div>
+        </div>
+    </div>
+
+<script>
+const fileInput = document.getElementById("fileInput");
+const preview = document.getElementById("preview");
+const previewContainer = document.getElementById("previewContainer");
+const result = document.getElementById("result");
+const resultContent = document.getElementById("resultContent");
+const predictBtn = document.getElementById("predictBtn");
+const loadingSpinner = document.getElementById("loadingSpinner");
+const loadingText = document.getElementById("loadingText");
+const pollensContainer = document.getElementById("pollens");
+
+const loadingMessages = [
+    "Checking pixels...",
+    "Counting RGB matrices...",
+    "Training virtual bees... 🐝",
+    "Scanning for pollen patterns...",
+    "Running flower recognition algorithms...",
+    "Comparing with flower database...",
+    "Detecting fragrance patterns... 🌸",
+    "Analyzing botanical features...",
+    "Classifying flower species...",
+    "Learning from nature's patterns...",
+    "Matching with known species...",
+];
+
+const pollenChars = ['•', '·', '˚', '∗', '∘', '∙', '⋅', '⸰', '°', 'ꔫ', 'ꕀ', '✦', '✧', '♡', '✿', '❀', '🌸', '🌺', '🌼', '🌷', '🌹'];
+
+// Create flying pollens
+function createPollens() {
+    const numPollens = 25;
+    
+    for (let i = 0; i < numPollens; i++) {
+        const pollen = document.createElement('div');
+        pollen.className = 'pollen';
+        pollen.textContent = pollenChars[Math.floor(Math.random() * pollenChars.length)];
+        pollen.style.left = Math.random() * 100 + 'vw';
+        pollen.style.top = '100vh';
+        pollen.style.fontSize = (Math.random() * 16 + 8) + 'px';
+        pollen.style.color = getRandomPollenColor();
+        pollen.style.animationDuration = (Math.random() * 15 + 10) + 's';
+        pollen.style.animationDelay = Math.random() * 5 + 's';
+        
+        pollensContainer.appendChild(pollen);
+    }
+}
+
+// Random pollen color
+function getRandomPollenColor() {
+    const colors = [
+        '#fbb6ce', '#f687b3', '#ed64a6', '#d53f8c', '#b83280',
+        '#a3bffa', '#7f9cf5', '#667eea', '#5a67d8', '#4c51bf',
+        '#9ae6b4', '#68d391', '#48bb78', '#38a169', '#2f855a',
+        '#faf089', '#f6e05e', '#ecc94b', '#d69e2e', '#b7791f'
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+}
+
+function getRandomLoadingMessage() {
+    return loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
+}
+
+let loadingInterval;
+
+// Continuous pollen production
+function startPollenProduction() {
+    createPollens();
+    createPollens();
+    createPollens();
+}
+
+// Start animatons when page is loaded
+window.addEventListener('load', () => {
+    startPollenProduction();
+});
+
+fileInput.addEventListener("change", () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+        alert("Please select an image file!");
+        fileInput.value = '';
+        return;
+    }
+
+    preview.src = URL.createObjectURL(file);
+    previewContainer.classList.remove("hidden");
+    result.classList.remove("show");
+    resultContent.innerHTML = '';
+});
+
+predictBtn.addEventListener("click", async () => {
+    const file = fileInput.files[0];
+    if (!file) {
+        alert("Please select an image!");
+        return;
+    }
+
+    const startTime = Date.now();
+    const formData = new FormData();
+    formData.append("file", file);
+
+    // Show loading, hide previous results
+    loadingSpinner.classList.remove("hidden");
+    result.classList.remove("show");
+    predictBtn.disabled = true;
+
+    loadingText.textContent = getRandomLoadingMessage();
+    loadingInterval = setInterval(() => {
+        loadingText.textContent = getRandomLoadingMessage();
+    }, 2000)
+
+    try {
+        console.log("Sending prediction request...");
+        
+        const response = await fetch("/predict", {
+            method: "POST",
+            body: formData
+        });
+
+        console.log("Response status:", response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Error response:", errorText);
+            throw new Error(`Server error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log("Prediction result:", data);
+
+        const predictionTime = Date.now() - startTime;
+        resultContent.innerHTML = `
+            <div class="mb-3">
+                <span class="text-lg font-semibold text-gray-700">Prediction: </span>
+                <span class="gradient-prediction text-xl font-bold capitalize">${data.class}</span>
+            </div>
+            <div class="mb-4">
+                <span class="text-lg font-semibold text-gray-700">Confidence: </span>
+                <span class="gradient-confidence text-xl font-bold">${(data.confidence * 100).toFixed(2)}%</span>
+                <span class="text-sm text-gray-500 ml-1">(${predictionTime}ms)</span>
+            </div>
+            <div class="mt-4 w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div class="gradient-progress h-3 rounded-full transition-all duration-1000 ease-out" style="width: ${data.confidence * 100}%"></div>
+            </div>
+        `;
+
+    } catch (error) {
+        console.error("Prediction error:", error);
+        resultContent.innerHTML = `
+            <div class="text-red-600 font-semibold">
+                ❌ Error: ${error.message}
+            </div>
+            <p class="text-sm text-gray-600 mt-2">Please try again with a different image</p>
+        `;
+    } finally {
+        clearInterval(loadingInterval);
+        loadingSpinner.classList.add("hidden");
+        result.classList.add("show");
+        predictBtn.disabled = false;
+
+        // Scroll to result smoothly
+        setTimeout(() => {
+            result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 100);
+    }
+});
+
+// Handle drag and drop for better UX
+document.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'copy';
+    }
+});
+
+document.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (e.dataTransfer.files.length) {
+        fileInput.files = e.dataTransfer.files;
+        fileInput.dispatchEvent(new Event('change'));
+    }
+});
+
+// Add some nice hover effects
+predictBtn.addEventListener('mouseenter', function() {
+    if (!this.disabled) {
+        this.classList.add('shadow-lg', 'transform', 'scale-105');
+    }
+});
+
+predictBtn.addEventListener('mouseleave', function() {
+    this.classList.remove('shadow-lg', 'transform', 'scale-105');
+});
+</script>
+
+</body>
+</html>
